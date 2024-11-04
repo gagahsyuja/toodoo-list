@@ -76,7 +76,7 @@ class DatabaseHelper {
         var dbClient = await db;
 
         var todo = await dbClient!
-            .query('todos', where: 'title like ?', whereArgs: [title]);
+            .query('todos', where: 'title like ?', whereArgs: ["%$title%"]);
 
         return todo.map((todo) => Todo.fromMap(todo)).toList();
     }
