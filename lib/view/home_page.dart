@@ -1,59 +1,16 @@
-import 'package:firebase_core/firebase_core.dart';
-import 'package:todo_list/view/login_page.dart';
-import 'firebase_options.dart';
 import 'package:flutter/material.dart';
-import 'package:todo_list/todo.dart';
 import 'package:todo_list/database_helper.dart';
+import 'package:todo_list/model/toodoo.dart';
 
-void main() async {
-  runApp(const MyApp());
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-}
+class HomePage extends StatefulWidget {
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  const HomePage({super.key});
 
-  // This widget is the root of your application.
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Todo-List App',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.pink),
-        useMaterial3: true,
-      ),
-      home: const LoginPage(),
-    );
-  }
+  State<HomePage> createState() => _HomePageState();
 }
 
-class TodoApp extends StatefulWidget {
-    
-    const TodoApp({Key? key}) : super(key: key);
-
-    @override
-    State<TodoApp> createState() => _TodoAppState();
-}
-
-class _TodoAppState extends State<TodoApp> {
+class _HomePageState() extends State<HomePage> {
 
     final TextEditingController _searchController = TextEditingController();
     final TextEditingController _titleController = TextEditingController();
@@ -61,7 +18,7 @@ class _TodoAppState extends State<TodoApp> {
 
     final dbHelper = DatabaseHelper();
 
-    List<Todo> _todos = [];
+    List<Toodoo> _todos = [];
 
     int _count = 0;
 
@@ -159,17 +116,26 @@ class _TodoAppState extends State<TodoApp> {
                     )
                 )
             ),
-            body: Column(
-                children: [
-                    Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: searchTextField()
-                    ),
-                    expandedListView(),
-                    const SizedBox(height: 30),
-                    floatingSearchButton(context),
-                    const SizedBox(height: 30)
+            body: Container(
+              margin: const EdgeInsets.symmetric(vertical: 10),
+              height: 100,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Colors.black12,
+                    offset: Offset(0, 2),
+                    blurRadius: 6
+                  )
                 ]
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+              child: Row(
+                children: [
+                  expandedListView()
+                ]
+              )
             )
         );
     }
