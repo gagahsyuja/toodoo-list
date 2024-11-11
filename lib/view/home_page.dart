@@ -1,6 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:todo_list/database_helper.dart';
+import 'package:todo_list/model/item_list.dart';
 import 'package:todo_list/model/toodoo.dart';
+import 'package:todo_list/view/login_page.dart';
 
 class HomePage extends StatefulWidget {
 
@@ -10,277 +13,221 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState() extends State<HomePage> {
+class _HomePageState extends State<HomePage> {
+  FirebaseAuth _auth = FirebaseAuth.instance;
+  FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-    final TextEditingController _searchController = TextEditingController();
-    final TextEditingController _titleController = TextEditingController();
-    final TextEditingController _descController = TextEditingController();
+  TextEditingController _titleController = TextEditingController();
+  TextEditingController _descriptionController = TextEditingController();
+  TextEditingController _searchController = TextEditingController();
 
-    final dbHelper = DatabaseHelper();
+  bool isComplete = false;
 
-    List<Toodoo> _todos = [];
+  Future<void> _signOut() async {
+    await _auth.signOut();
+    runApp(new MaterialApp(
+      home: new LoginPage()
+    ));
+  }
 
-    int _count = 0;
+  Future<QuerySnapshot>? searchResultsFuture;
 
-    void refreshItemList() async {
-        final todos = await dbHelper.getAllTodos();
-        setState(() {
-            _todos = todos;
-        });
+  Future<void> searchResult(String textEntered) async {
+    QuerySnapshot querySnapshot = await FirebaseFirestore.instance
+      .collection("Toodoos")
+      .where("title", isGreaterThanOrEqualTo: textEntered)
+      .where("title", isLessThan: '${textEntered}z')
+      .get();
+
+    setState(() {
+      searchResultsFuture = Future.value(querySnapshot);
+    });
+  }
+
+  void clearText() {
+    _titleController.clear();
+    _descriptionController.clear();
+  }
+
+  void initState() {
+    super.initState();
+    // getTodo();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    CollectionReference todoCollection = _firestore.collection('Toodoos');
+    final User? user = _auth.currentUser;
+
+    Future<void> addTodo() {
+      return todoCollection.add({
+        'title': _titleController.text,
+        'description': _descriptionController.text,
+        'isComplete': isComplete,
+        'uid': _auth.currentUser!.uid,
+      }).catchError((error) => print('Failed to add todo: $error'));
     }
 
-    void searchItems() async {
-        final keyword = _searchController.text.trim();
-
-        if (keyword.isNotEmpty) {
-
-            final todos = await dbHelper.getTodoByTitle(keyword);
-            
-            setState(() {
-                _todos = todos;
-            });
-
-        } else {
-            
-            refreshItemList();
-        }
-    }
-
-    void addItem(String title, String desc) async {
-
-        final todo = Todo(
-            id: _count,
-            title: title,
-            description: desc,
-            completed: false
-        );
-
-        await dbHelper.insertTodo(todo);
-
-        refreshItemList();
-    }
-
-    void updateItem(Todo todo, bool completed) async {
-
-        final item = Todo(
-            id: todo.id,
-            title: todo.title,
-            description: todo.description,
-            completed: completed
-        );
-
-        await dbHelper.updateTodo(item);
-
-        refreshItemList();
-    }
-
-    void deleteItem(int id) async {
-        
-        await dbHelper.deleteTodo(id);
-
-        refreshItemList();
-    }
-
-    @override
-    void initState() {
-        
-        refreshItemList();
-
-        super.initState();
-    }
-
-    @override
-    Widget build(BuildContext context) {
-        return Scaffold(
-            appBar: AppBar(
-                title: RichText(
-                    text: const TextSpan(
-                        children: [
-                            TextSpan(
-                                text: 'TooDoo',
-                                style: TextStyle(
-                                    color: Colors.pink,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 23
-                                )
-                            ),
-                            TextSpan(
-                                text: 'List',
-                                style: TextStyle(
-                                    color: Colors.black54,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 24
-                                )
-                            )
-                        ]
-                    )
+    return Scaffold(
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: RichText(
+          text: const TextSpan(
+            children: [
+              TextSpan(
+                text: 'TooDoo',
+                style: TextStyle(
+                  color: Colors.pink,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 23
                 )
-            ),
-            body: Container(
-              margin: const EdgeInsets.symmetric(vertical: 10),
-              height: 100,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black12,
-                    offset: Offset(0, 2),
-                    blurRadius: 6
-                  )
-                ]
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
-              child: Row(
-                children: [
-                  expandedListView()
-                ]
+              TextSpan(
+                text: 'List',
+                style: TextStyle(
+                  color: Colors.black54,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 24
+                )
               )
-            )
-        );
-    }
-
-    TextField searchTextField() {
-        
-        return TextField(
-            controller: _searchController,
-            decoration: const InputDecoration(
-                labelText: 'Looking for?',
+            ]
+          )
+        ),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.logout),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: Text('Logout'),
+                  content: Text('Apakah anda yakin ingin logout?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                      },
+                      child: const Text('Tidak')
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        _signOut();
+                      },
+                      child: const Text('Ya')
+                    )
+                  ]
+                )
+              );
+            }
+          )
+        ]
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: 15, horizontal: 10),
+            child: TextField(
+              decoration: InputDecoration(
+                labelText: 'Search',
                 prefixIcon: Icon(Icons.search),
                 border: OutlineInputBorder()
-            ),
-            onChanged: (_) {
-                searchItems();
-            }
-        );
-    }
+              ),
+              onChanged: (textEntered) {
+                searchResult(textEntered);
 
-    Expanded expandedListView() {
-        
-        return Expanded(
-            child: ListView.builder(
-                itemCount: _todos.length,
-                itemBuilder: (context, index) {
-                    var todo = _todos[index];
-
-                    return ListTile(
-                        leading: todo.completed
-                            ? IconButton(
-                                icon: const Icon(
-                                    Icons.check_circle,
-                                    color: Colors.pink
-                                ),
-                                onPressed: () {
-                                    updateItem(todo, !todo.completed);
-                                }
-                            )
-                            : IconButton(
-                                icon: const Icon(
-                                    Icons.radio_button_unchecked
-                                ),
-                                onPressed: () {
-                                    updateItem(todo, !todo.completed);
-                                }
-                            ),
-                        title: Text(
-                            todo.title,
-                            style: const TextStyle(
-                                color: Colors.pink,
-                                fontWeight: FontWeight.w500,
-                                fontSize: 18
-                            )
-                        ),
-                        subtitle: Text(
-                            todo.description == '' ? 'No description' : todo.description,
-                            style: const TextStyle(
-                                color: Colors.black54,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 15
-                            )
-                        ),
-                        trailing: IconButton(
-                            icon: const Icon(
-                                Icons.delete,
-                                color: Colors.pinkAccent
-                            ),
-                            onPressed: () {
-                                deleteItem(todo.id);
-                            }
-                        )
-                    );
-                }
+                setState(() {
+                  _searchController.text = textEntered;
+                });
+              }
             )
-        );
-    }
+          ),
+          Expanded(
+            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: _searchController.text.isEmpty
+                ? _firestore
+                    .collection('Toodoos')
+                    .where('uid', isEqualTo: user!.uid)
+                    .snapshots()
+                : searchResultsFuture != null
+                  ? searchResultsFuture!
+                      .asStream()
+                      .cast<QuerySnapshot<Map<String, dynamic>>>()
+                  : Stream.empty(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                List<Toodoo> listTodo = snapshot.data!.docs.map((document) {
+                  final data = document.data();
+                  final String title = data['title'];
+                  final String description = data['description'];
+                  final bool isComplete = data['isComplete'];
+                  final String uid = user!.uid;
 
-    FloatingActionButton floatingSearchButton(BuildContext context) {
+                  return Toodoo(
+                    description: description,
+                    title: title,
+                    isComplete: isComplete,
+                    uid: uid
+                  );
+                }).toList();
 
-        return FloatingActionButton(
-            onPressed: () {
-
-                _titleController.clear();
-                _descController.clear();
-
-                showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                        title: const Text(
-                            'Doing something?',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w500
-                            )
-                        ),
-                        content: SizedBox(
-                            width: 200,
-                            height: 200,
-                            child: Column(
-                                children: [
-                                    TextField(
-                                        controller: _titleController,
-                                        decoration: const InputDecoration(
-                                            hintText: 'The title',
-                                            hintStyle: TextStyle(
-                                                color: Colors.black54
-                                            )
-                                        ),
-                                    ),
-                                    TextField(
-                                        controller: _descController,
-                                        decoration: const InputDecoration(
-                                            hintText: 'The description',
-                                            hintStyle: TextStyle(
-                                                color: Colors.black54
-                                            )
-                                        )
-                                    )
-                                ]
-                            )
-                        ),
-                        actions: [
-                            TextButton(
-                                child: const Text('Cancel'),
-                                onPressed: () => Navigator.pop(context)
-                            ),
-                            TextButton(
-                                child: const Text('Add'),
-                                onPressed: () {
-
-                                    addItem(_titleController.text, _descController.text);
-
-                                    Navigator.pop(context);
-
-                                    setState(() {
-                                        _count = _count + 1;
-                                    });
-                                }
-                            )
-                        ]
-                    ),
+                return ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: listTodo.length,
+                  itemBuilder: (context, index) {
+                    return ItemList(
+                      toodoo: listTodo[index],
+                      transaksiDocId: snapshot.data!.docs[index].id
+                    );
+                  }
                 );
-            },
-            child: const Icon(Icons.add)
-        );
-    }
+              }
+            )
+          )
+        ]
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Add Toodoo'),
+              content: SizedBox(
+                width: 200,
+                height: 100,
+                child: Column(
+                  children: [
+                    TextField(
+                      controller: _titleController,
+                      decoration: InputDecoration(hintText: 'Judul Toodoo')
+                    ),
+                    TextField(
+                      controller: _descriptionController,
+                      decoration: InputDecoration(hintText: 'Deskripsi Toodoo')
+                    )
+                  ]
+                )
+              ),
+              actions: [
+                TextButton(
+                  child: Text('Batalkan'),
+                  onPressed: () => Navigator.pop(context)
+                ),
+                TextButton(
+                  child: Text('Tambah'),
+                  onPressed: () {
+                    addTodo();
+                    clearText();
+                    Navigator.pop(context);
+                  }
+                )
+              ]
+            )
+          );
+        },
+        child: const Icon(Icons.add)
+      )
+    );
+  }
 }
